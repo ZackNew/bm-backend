@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat    = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AdminStatus {
+  active
+  inactive
+}
+
+enum PlatformAdminRole {
+  super_admin
+  user_manager
+  analytics_viewer
+  system_manager
+  billing_manager
+}
+
+model PlatformAdmin {
+  id                           String              @id @default(uuid())
+  name                         String
+  email                        String              @unique
+  passwordHash                 String              @map("password_hash")
+  roles                        PlatformAdminRole[]
+  status                       AdminStatus         @default(active)
+  mustResetPassword            Boolean             @default(true) @map("must_reset_password")
+  passwordResetToken           String?             @map("password_reset_token")
+  passwordResetTokenExpiresAt  DateTime?           @map("password_reset_token_expires_at")
+  passwordChangedAt            DateTime?           @map("password_changed_at")
+  lastLoginAt                  DateTime?           @map("last_login_at")
+  createdAt                    DateTime            @default(now()) @map("created_at")
+  updatedAt                    DateTime            @updatedAt @map("updated_at")
+
+  @@map("platform_admins")
+}
+
+enum OtpType {
+  password_reset
+  email_verification
+  two_factor_auth
+}
+
+enum UserType {
+  platform_admin
+  user
+  manager
+  tenant
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  otp       String
+  type      OtpType
+  userType  UserType @map("user_type")
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  isUsed    Boolean  @default(false) @map("is_used")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("otps")
+  @@index([userId, type])
+  @@index([otp, type])
+}
+
+enum UserStatus {
+  active
+  inactive
+}
+
+model User {
+  id                           String      @id @default(uuid())
+  name                         String
+  email                        String      @unique
+  passwordHash                 String      @map("password_hash")
+  phone                        String?
+  status                       UserStatus  @default(active)
+  mustResetPassword            Boolean     @default(false) @map("must_reset_password")
+  passwordChangedAt            DateTime?   @map("password_changed_at")
+  lastLoginAt                  DateTime?   @map("last_login_at")
+  createdAt                    DateTime    @default(now()) @map("created_at")
+  updatedAt                    DateTime    @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Manager {
+  id                           String      @id @default(uuid())
+  userId                       String      @map("user_id")
+  name                         String
+  email                        String      @unique
+  passwordHash                 String      @map("password_hash")
+  phone                        String?
+  status                       UserStatus  @default(active)
+  mustResetPassword            Boolean     @default(true) @map("must_reset_password")
+  passwordChangedAt            DateTime?   @map("password_changed_at")
+  lastLoginAt                  DateTime?   @map("last_login_at")
+  createdAt                    DateTime    @default(now()) @map("created_at")
+  updatedAt                    DateTime    @updatedAt @map("updated_at")
+
+  @@map("managers")
+}
