@@ -24,6 +24,18 @@ export class AuthService {
   async login(dto: LoginManagerDto) {
     const manager = await this.prisma.manager.findUnique({
       where: { email: dto.email },
+      include: {
+        buildingRoles: {
+          include: {
+            building: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!manager) {
@@ -48,11 +60,19 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
+    const buildings = manager.buildingRoles.map((br) => br.buildingId);
+    const buildingAssignments = manager.buildingRoles.map((br) => ({
+      buildingId: br.buildingId,
+      buildingName: br.building.name,
+      roles: br.roles,
+    }));
+
     const payload = {
       sub: manager.id,
       email: manager.email,
       role: 'manager',
       type: 'app',
+      buildings,
     };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
@@ -65,6 +85,7 @@ export class AuthService {
         id: manager.id,
         name: manager.name,
         email: manager.email,
+        buildings: buildingAssignments,
       },
       mustResetPassword: manager.mustResetPassword,
     };
@@ -149,5 +170,51 @@ export class AuthService {
     });
 
     return { message: 'Password reset successfully' };
+  }
+
+  async refresh(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify<{
+        sub: string;
+        email: string;
+        role: string;
+        type: string;
+        buildings: string[];
+      }>(refreshToken);
+
+      const manager = await this.prisma.manager.findUnique({
+        where: { id: payload.sub },
+        include: {
+          buildingRoles: {
+            select: {
+              buildingId: true,
+            },
+          },
+        },
+      });
+
+      if (!manager || manager.status === 'inactive') {
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      const buildings = manager.buildingRoles.map((br) => br.buildingId);
+
+      const newPayload = {
+        sub: manager.id,
+        email: manager.email,
+        role: 'manager',
+        type: 'app',
+        buildings,
+      };
+
+      const accessToken = this.jwtService.sign(newPayload, {
+        expiresIn: '15m',
+      });
+
+      return { accessToken };
+    } catch (error) {
+      console.error(error);
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 }

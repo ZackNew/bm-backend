@@ -17,9 +17,9 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { Roles } from '../../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
 import { User } from 'src/common/decorators/user.decorator';
 
 @Controller('v1/platform/auth')
@@ -122,6 +122,17 @@ export class AuthController {
     return {
       success: true,
       data: result,
+    };
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() body: { refreshToken: string }) {
+    const result = await this.authService.refresh(body.refreshToken);
+    return {
+      success: true,
+      data: result,
+      message: 'Token refreshed successfully',
     };
   }
 }

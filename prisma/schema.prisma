@@ -149,6 +149,7 @@ model Building {
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
   managerRoles     ManagerBuildingRole[]
+  units            Unit[]
 
   @@map("buildings")
 }
@@ -168,4 +169,38 @@ model ManagerBuildingRole {
   @@index([managerId])
   @@index([buildingId])
   @@map("manager_building_roles")
+}
+
+enum UnitType {
+  retail
+  office
+  storage
+  restaurant
+  other
+}
+
+enum UnitStatus {
+  vacant
+  occupied
+  inactive
+}
+
+model Unit {
+  id          String      @id @default(uuid())
+  buildingId  String      @map("building_id")
+  unitNumber  String      @map("unit_number")
+  floor       Int?
+  size        Decimal?
+  type        UnitType?
+  rentPrice   Decimal     @map("rent_price")
+  status      UnitStatus  @default(vacant)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  building    Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@unique([buildingId, unitNumber])
+  @@index([buildingId])
+  @@index([status])
+  @@map("units")
 }

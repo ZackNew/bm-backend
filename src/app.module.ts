@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from './config/config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/platform-admin/auth/auth.module';
@@ -8,6 +8,10 @@ import { AuthModule as UserAuthModule } from './modules/user/auth/auth.module';
 import { AuthModule as ManagerAuthModule } from './modules/manager/auth/auth.module';
 import { PlansModule } from './modules/platform-admin/plans/plans.module';
 import { ManagersModule } from './modules/user/managers/managers.module';
+import { BuildingsModule } from './modules/user/buildings/buildings.module';
+import { UnitsModule } from './modules/user/units/units.module';
+import { BuildingContextMiddleware } from './common/middleware/building-context.middleware';
+import { UnitsController } from './modules/user/units/units.controller';
 
 @Module({
   imports: [
@@ -20,6 +24,12 @@ import { ManagersModule } from './modules/user/managers/managers.module';
     ManagerAuthModule,
     PlansModule,
     ManagersModule,
+    BuildingsModule,
+    UnitsModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(BuildingContextMiddleware).forRoutes(UnitsController);
+  }
+}

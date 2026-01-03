@@ -33,6 +33,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.building;
   }
 
+  get unit() {
+    return this.client.unit;
+  }
+
   get managerBuildingRole() {
     return this.client.managerBuildingRole;
   }

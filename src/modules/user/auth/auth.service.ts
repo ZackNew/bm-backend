@@ -180,4 +180,39 @@ export class AuthService {
 
     return { message: 'Password changed successfully' };
   }
+
+  async refresh(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify<{
+        sub: string;
+        email: string;
+        role: string;
+        type: string;
+      }>(refreshToken);
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!user || user.status === 'inactive') {
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      const newPayload = {
+        sub: user.id,
+        email: user.email,
+        role: 'owner',
+        type: 'app',
+      };
+
+      const accessToken = this.jwtService.sign(newPayload, {
+        expiresIn: '15m',
+      });
+
+      return { accessToken };
+    } catch (error) {
+      console.error(error);
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
 }

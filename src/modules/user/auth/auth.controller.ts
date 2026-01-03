@@ -72,4 +72,15 @@ export class AuthController {
       data: result,
     };
   }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() body: { refreshToken: string }) {
+    const result = await this.authService.refresh(body.refreshToken);
+    return {
+      success: true,
+      data: result,
+      message: 'Token refreshed successfully',
+    };
+  }
 }

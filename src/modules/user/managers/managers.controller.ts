@@ -10,11 +10,12 @@ import {
 } from '@nestjs/common';
 import { ManagersService } from './managers.service';
 import { CreateManagerDto, UpdateManagerDto } from './dto';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { User } from '../../../common/decorators/user.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { OwnerOnlyGuard } from 'src/common/guards/owner-only.guard';
+import { User } from 'src/common/decorators/user.decorator';
 
 @Controller('v1/app/managers')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OwnerOnlyGuard)
 export class ManagersController {
   constructor(private readonly managersService: ManagersService) {}
 

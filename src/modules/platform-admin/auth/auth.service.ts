@@ -283,4 +283,41 @@ export class AuthService {
 
     return { message: 'Password reset successfully' };
   }
+
+  async refresh(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify<{
+        sub: string;
+        email: string;
+        role: string;
+        roles: string[];
+        type: string;
+      }>(refreshToken);
+
+      const admin = await this.prisma.platformAdmin.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!admin || admin.status === 'inactive') {
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      const newPayload = {
+        sub: admin.id,
+        email: admin.email,
+        role: 'platform_admin',
+        roles: admin.roles,
+        type: 'platform',
+      };
+
+      const accessToken = this.jwtService.sign(newPayload, {
+        expiresIn: '15m',
+      });
+
+      return { accessToken };
+    } catch (error) {
+      console.error(error);
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
 }
