@@ -16,6 +16,8 @@ import { MaintenanceRequestsModule } from './modules/user/maintenance-requests/m
 import { PaymentsModule } from './modules/user/payments/payments.module';
 import { LeasesModule } from './modules/user/leases/leases.module';
 import { InvoicesModule } from './modules/user/invoices/invoices.module';
+import { ReportsModule } from './modules/user/reports/reports.module';
+import { DashboardModule } from './modules/user/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { InvoicesModule } from './modules/user/invoices/invoices.module';
     PaymentsModule,
     LeasesModule,
     InvoicesModule,
+    ReportsModule,
+    DashboardModule,
   ],
 })
 export class AppModule implements NestModule {
@@ -48,6 +52,8 @@ export class AppModule implements NestModule {
         'v1/app/payments',
         'v1/app/invoices',
         'v1/app/leases',
+        'v1/app/reports',
+        'v1/app/dashboard',
       );
   }
 }
