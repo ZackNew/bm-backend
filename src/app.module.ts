@@ -13,6 +13,9 @@ import { UnitsModule } from './modules/user/units/units.module';
 import { BuildingContextMiddleware } from './common/middleware/building-context.middleware';
 import { TenantsModule } from './modules/user/tenants/tenants.module';
 import { MaintenanceRequestsModule } from './modules/user/maintenance-requests/maintenance-requests.module';
+import { PaymentsModule } from './modules/user/payments/payments.module';
+import { LeasesModule } from './modules/user/leases/leases.module';
+import { InvoicesModule } from './modules/user/invoices/invoices.module';
 
 @Module({
   imports: [
@@ -29,6 +32,9 @@ import { MaintenanceRequestsModule } from './modules/user/maintenance-requests/m
     UnitsModule,
     TenantsModule,
     MaintenanceRequestsModule,
+    PaymentsModule,
+    LeasesModule,
+    InvoicesModule,
   ],
 })
 export class AppModule implements NestModule {
@@ -39,6 +45,9 @@ export class AppModule implements NestModule {
         'v1/app/units',
         'v1/app/tenants',
         'v1/app/maintenance-requests',
+        'v1/app/payments',
+        'v1/app/invoices',
+        'v1/app/leases',
       );
   }
 }

@@ -242,6 +242,7 @@ model Tenant {
   building                     Building      @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   unit                         Unit?         @relation(fields: [unitId], references: [id], onDelete: SetNull)
   leases                       Lease[]
+  invoices                     Invoice[] 
   maintenanceRequests          MaintenanceRequest[]
   payments                     Payment[]
 
@@ -273,6 +274,7 @@ model Lease {
   tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   unit            Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
   building        Building      @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  paymentPeriods  PaymentPeriod[]
 
   @@index([tenantId])
   @@index([unitId])
@@ -353,6 +355,7 @@ model Payment {
   unit            Unit?         @relation(fields: [unitId], references: [id], onDelete: SetNull)
   tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice         Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  paymentPeriods  PaymentPeriod[]
 
   @@index([buildingId])
   @@index([unitId])
@@ -386,6 +389,7 @@ model Invoice {
 
   building        Building      @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   unit            Unit?         @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   payments        Payment[]
 
   @@index([buildingId])
@@ -431,4 +435,28 @@ model UtilityReading {
   @@index([buildingId])
   @@index([type])
   @@map("utility_readings")
+}
+
+enum PaymentPeriodStatus {
+  unpaid
+  paid
+  overdue
+}
+
+model PaymentPeriod {
+  id           String   @id @default(uuid())
+  leaseId      String
+  month        String   // Format: YYYY-MM
+  rentAmount   Decimal  @db.Decimal(10, 2)
+  status       PaymentPeriodStatus @default(unpaid)
+  paidAt       DateTime?
+  paymentId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lease        Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  payment      Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([leaseId, month])
+  @@map("payment_periods")
 }

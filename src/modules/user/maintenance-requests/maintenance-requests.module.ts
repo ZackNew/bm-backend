@@ -4,6 +4,6 @@ import { MaintenanceRequestsController } from './maintenance-requests.controller
 
 @Module({
   providers: [MaintenanceRequestsService],
-  controllers: [MaintenanceRequestsController]
+  controllers: [MaintenanceRequestsController],
 })
 export class MaintenanceRequestsModule {}

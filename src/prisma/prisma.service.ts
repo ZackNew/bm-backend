@@ -73,6 +73,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.subscriptionPlan;
   }
 
+  $transaction<T>(fn: (tx: PrismaClient) => Promise<T>): Promise<T> {
+    return this.client.$transaction(fn);
+  }
+
   async onModuleInit() {
     await this.client.$connect();
   }
