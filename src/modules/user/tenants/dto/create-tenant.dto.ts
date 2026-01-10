@@ -19,4 +19,8 @@ export class CreateTenantDto {
   @IsOptional()
   @IsEnum(TenantStatus as object)
   status?: TenantStatus;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
 }

@@ -8,6 +8,7 @@ import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { Prisma } from 'generated/prisma/browser';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class TenantsService {
@@ -44,10 +45,20 @@ export class TenantsService {
       }
     }
 
+    let passwordHash: string | undefined;
+
+    if (dto.password) {
+      passwordHash = await bcrypt.hash(dto.password, 10);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _password, ...tenantData } = dto;
+
     const tenant = await this.prisma.tenant.create({
       data: {
-        ...dto,
+        ...tenantData,
         buildingId,
+        passwordHash,
       },
       include: {
         unit: {

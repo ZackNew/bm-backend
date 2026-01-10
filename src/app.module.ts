@@ -22,6 +22,8 @@ import { ActivityLogsModule } from './modules/user/activity-logs/activity-logs.m
 import { UsersModule } from './modules/platform-admin/users/users.module';
 import { SubscriptionsModule } from './modules/user/subscriptions/subscriptions.module';
 import { UserSubscriptionsModule } from './modules/user/user-subscriptions/user-subscriptions.module';
+import { TenantAuthModule } from './modules/tenant/auth/auth.module';
+import { PortalModule } from './modules/tenant/portal/portal.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { UserSubscriptionsModule } from './modules/user/user-subscriptions/user-
     UsersModule,
     SubscriptionsModule,
     UserSubscriptionsModule,
+    TenantAuthModule,
+    PortalModule,
   ],
 })
 export class AppModule implements NestModule {
