@@ -622,6 +622,7 @@ enum ActivityEntityType {
   parking_request
   payment_request
   notification
+  app_version_config
 }
 
 model ActivityLog {
@@ -731,6 +732,22 @@ enum NotificationType {
   subscription_upgraded
   subscription_expiring
   subscription_expired
+}
+
+model AppVersionConfig {
+  id                      String    @id @default(uuid())
+  androidMinimumVersion   String    @map("android_minimum_version")
+  androidLatestVersion    String    @map("android_latest_version")
+  iosMinimumVersion       String    @map("ios_minimum_version")
+  iosLatestVersion        String    @map("ios_latest_version")
+  versionDescription      String    @map("version_description") @db.Text
+  lastForceUpdateVersion  String    @map("last_force_update_version")
+  isOptional              Boolean   @default(true) @map("is_optional")
+  updatedById             String?   @map("updated_by_id")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  @@map("app_version_configs")
 }
 
 model Notification {
