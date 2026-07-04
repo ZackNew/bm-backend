@@ -9,9 +9,11 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StreamableFile } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -235,6 +237,23 @@ export class PortalController {
       offsetNum,
       q,
     );
+  }
+
+  @Get('invoices/:id/download')
+  @ApiOperation({ summary: 'Download my invoice as PDF' })
+  @ApiResponse({ status: 200, description: 'Return invoice PDF' })
+  async downloadInvoice(
+    @User() user: { id: string },
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const pdfDoc = await this.portalService.downloadInvoice(user.id, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=invoice-${id}.pdf`,
+    );
+    pdfDoc.pipe(res);
   }
 
   @Get('payment-requests/:id/receipt')

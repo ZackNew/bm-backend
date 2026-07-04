@@ -12,6 +12,11 @@ import { EmailService } from 'src/common/email/email.service';
 import { PdfService } from 'src/common/pdf/pdf.service';
 import { NotificationsService } from 'src/common/notifications/notifications.service';
 import { buildPageInfo } from 'src/common/pagination';
+import {
+  assertRentAmountMatchesTotal,
+  computeRentBaseAmount,
+  computeRentTaxBreakdown,
+} from 'src/common/tax/rent-period.util';
 
 const paymentInclude = {
   tenant: { select: { id: true, name: true, email: true } },
@@ -72,42 +77,38 @@ export class PaymentsService {
       }),
     ]);
 
-    // For rent: recompute base amount from DB periods — ignore client-sent amount
+    // For rent: base comes from the DB periods, tax is computed server-side,
+    // and the client-sent amount must match the resulting total
     let baseAmount = dto.amount;
-    if (
-      dto.type === 'rent' &&
-      dto.monthsCovered &&
-      dto.monthsCovered.length > 0
-    ) {
+    let vatAmount = 0;
+    let withholdingAmount = 0;
+    let paymentAmount = dto.amount;
+
+    if (dto.type === 'rent') {
+      if (!dto.monthsCovered || dto.monthsCovered.length === 0) {
+        throw new BadRequestException(
+          'Rent payments must cover at least one payment period',
+        );
+      }
       const periods = await this.prisma.paymentPeriod.findMany({
         where: { leaseId: activeLease.id, month: { in: dto.monthsCovered } },
-        select: { rentAmount: true },
+        select: { month: true, status: true, rentAmount: true },
       });
-      baseAmount = periods.reduce((sum, p) => sum + Number(p.rentAmount), 0);
+      baseAmount = computeRentBaseAmount(periods, dto.monthsCovered);
+      const breakdown = computeRentTaxBreakdown(
+        baseAmount,
+        Number(building?.vatRate ?? 0),
+        Number(building?.withholdingRate ?? 0),
+        activeLease.applyWithholding,
+      );
+      vatAmount = breakdown.vatAmount;
+      withholdingAmount = breakdown.withholdingAmount;
+      paymentAmount = breakdown.totalAmount;
+      assertRentAmountMatchesTotal(dto.amount, paymentAmount);
     }
 
     if (baseAmount <= 0) {
       throw new BadRequestException('Payment amount must be greater than 0');
-    }
-
-    // Compute tax breakdown for rent
-    let vatAmount = 0;
-    let withholdingAmount = 0;
-    let paymentAmount = baseAmount;
-
-    if (dto.type === 'rent') {
-      const vatRate = Number(building?.vatRate ?? 0);
-      const withholdingRate = Number(building?.withholdingRate ?? 0);
-      vatAmount =
-        vatRate > 0 ? Math.round(baseAmount * (vatRate / 100) * 100) / 100 : 0;
-      withholdingAmount =
-        activeLease.applyWithholding && withholdingRate > 0
-          ? Math.round(
-              (baseAmount + vatAmount) * (withholdingRate / 100) * 100,
-            ) / 100
-          : 0;
-      paymentAmount =
-        Math.round((baseAmount + vatAmount - withholdingAmount) * 100) / 100;
     }
 
     // Build invoice line items

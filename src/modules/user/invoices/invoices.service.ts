@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from 'generated/prisma/client';
 import { PdfService } from 'src/common/pdf/pdf.service';
+import { parseInvoiceItems } from 'src/common/pdf/invoice-items.util';
 import { buildPageInfo } from 'src/common/pagination';
 
 const invoiceInclude = {
@@ -86,12 +87,10 @@ export class InvoicesService {
       buildingAddress: building?.address || undefined,
       tenantName: invoice.tenant?.name || 'Tenant',
       tenantEmail: invoice.tenant?.email || '',
-      items: [
-        {
-          description: `Rent for Unit ${invoice.unit?.unitNumber || 'N/A'}`,
-          amount: Number(invoice.amount),
-        },
-      ],
+      items: parseInvoiceItems(invoice.items, {
+        description: `Rent for Unit ${invoice.unit?.unitNumber || 'N/A'}`,
+        amount: Number(invoice.amount),
+      }),
       total: Number(invoice.amount),
       status: invoice.status,
     });

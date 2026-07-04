@@ -53,6 +53,7 @@ export class TenantsService {
         buildingId,
         passwordHash,
         status: 'inactive',
+        mustResetPassword: true,
       },
     });
 
@@ -355,6 +356,7 @@ export class TenantsService {
           phone: dto.phone,
           tin: dto.tin,
           passwordHash,
+          mustResetPassword: !dto.password,
         },
       });
 
