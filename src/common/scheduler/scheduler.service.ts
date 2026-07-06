@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserDeletionService } from '../user-deletion/user-deletion.service';
 
 @Injectable()
 export class SchedulerService {
@@ -12,7 +13,17 @@ export class SchedulerService {
     private prisma: PrismaService,
     private emailService: EmailService,
     private notificationsService: NotificationsService,
+    private userDeletionService: UserDeletionService,
   ) {}
+
+  // ========== ACCOUNT DELETION ==========
+
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  async purgeDeletedUsers() {
+    this.logger.log('Purging owner accounts past the deletion grace period...');
+    const purged = await this.userDeletionService.purgeExpiredUsers();
+    this.logger.log(`Purged ${purged} owner account(s)`);
+  }
 
   // ========== SUBSCRIPTIONS ==========
 

@@ -82,10 +82,27 @@ model User {
   mustResetPassword            Boolean     @default(false) @map("must_reset_password")
   passwordChangedAt            DateTime?   @map("password_changed_at")
   lastLoginAt                  DateTime?   @map("last_login_at")
+  deletedAt                    DateTime?   @map("deleted_at")
+  deletedById                  String?     @map("deleted_by_id")
   createdAt                    DateTime    @default(now()) @map("created_at")
   updatedAt                    DateTime    @updatedAt @map("updated_at")
 
+  @@index([deletedAt])
   @@map("users")
+}
+
+/// Financial snapshot of a purged owner account, kept for tax/audit purposes.
+/// Written once at purge time; tenant PII is stripped before archiving.
+model UserDeletionArchive {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  userName  String   @map("user_name")
+  userEmail String   @map("user_email")
+  deletedAt DateTime @map("deleted_at")
+  data      Json
+  purgedAt  DateTime @default(now()) @map("purged_at")
+
+  @@map("user_deletion_archives")
 }
 
 enum ManagerRole {
@@ -611,6 +628,7 @@ enum ActivityAction {
 }
 
 enum ActivityEntityType {
+  user
   unit
   tenant
   lease

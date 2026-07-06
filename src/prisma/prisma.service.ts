@@ -117,8 +117,15 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.appVersionConfig;
   }
 
-  $transaction<T>(fn: (tx: PrismaClient) => Promise<T>): Promise<T> {
-    return this.client.$transaction(fn);
+  get userDeletionArchive() {
+    return this.client.userDeletionArchive;
+  }
+
+  $transaction<T>(
+    fn: (tx: PrismaClient) => Promise<T>,
+    options?: { maxWait?: number; timeout?: number },
+  ): Promise<T> {
+    return this.client.$transaction(fn, options);
   }
 
   async onModuleInit() {

@@ -92,6 +92,190 @@ export class SoftDeleteService {
   }
 
   /**
+   * Soft-delete an owner account and everything it owns: buildings (with the
+   * full building cascade), managers, subscriptions, device tokens and OTPs.
+   *
+   * Every cascaded row receives the same `deletedAt` timestamp, which acts as
+   * the restore key: `restoreUser` only resurrects rows deleted by this exact
+   * operation, never rows that were already soft-deleted beforehand.
+   *
+   * Returns the timestamp the account will be purged is based on (deletedAt).
+   */
+  async softDeleteUser(userId: string, deletedById: string): Promise<Date> {
+    const at = now();
+    const data = softDeleteData(at, deletedById);
+
+    await this.prisma.$transaction(async (tx) => {
+      const buildings = await tx.building.findMany({
+        where: { userId, deletedAt: null },
+        select: { id: true },
+      });
+      const buildingIds = buildings.map((b) => b.id);
+
+      await tx.user.updateMany({
+        where: { id: userId, deletedAt: null },
+        data: { ...data, status: 'inactive' },
+      });
+
+      await tx.building.updateMany({
+        where: { id: { in: buildingIds } },
+        data,
+      });
+      await tx.unit.updateMany({
+        where: { buildingId: { in: buildingIds }, deletedAt: null },
+        data,
+      });
+      await tx.tenant.updateMany({
+        where: { buildingId: { in: buildingIds }, deletedAt: null },
+        data,
+      });
+      await tx.lease.updateMany({
+        where: { buildingId: { in: buildingIds }, deletedAt: null },
+        data,
+      });
+      await tx.parkingRegistration.updateMany({
+        where: { buildingId: { in: buildingIds }, deletedAt: null },
+        data,
+      });
+      await tx.maintenanceRequest.updateMany({
+        where: { buildingId: { in: buildingIds }, deletedAt: null },
+        data,
+      });
+      await tx.managerBuildingRole.updateMany({
+        where: {
+          deletedAt: null,
+          OR: [{ buildingId: { in: buildingIds } }, { manager: { userId } }],
+        },
+        data,
+      });
+      await tx.manager.updateMany({
+        where: { userId, deletedAt: null },
+        data,
+      });
+
+      // Cancel active subscriptions; the history row's createdAt is pinned to
+      // `at` so restore can tell deletion-cancellations apart from user ones.
+      const activeSubscriptions = await tx.subscription.findMany({
+        where: { userId, status: 'active' },
+        select: { id: true, planId: true },
+      });
+      if (activeSubscriptions.length > 0) {
+        await tx.subscription.updateMany({
+          where: { id: { in: activeSubscriptions.map((s) => s.id) } },
+          data: { status: 'cancelled' },
+        });
+        await tx.subscriptionHistory.createMany({
+          data: activeSubscriptions.map((s) => ({
+            userId,
+            subscriptionId: s.id,
+            action: 'cancelled' as const,
+            oldPlanId: s.planId,
+            newPlanId: s.planId,
+            notes: 'Cancelled due to account deletion',
+            createdAt: at,
+          })),
+        });
+      }
+
+      // Push tokens and pending OTPs are dead the moment the account is
+      // scheduled for deletion; they are recreated on login after a restore.
+      await tx.deviceToken.deleteMany({
+        where: { userId, userType: 'user' },
+      });
+      await tx.otp.deleteMany({ where: { userId, userType: 'user' } });
+    });
+
+    return at;
+  }
+
+  /**
+   * Restore a soft-deleted owner within the grace period. Uses the shared
+   * deletion timestamp to restore exactly the cascade set of that operation.
+   */
+  async restoreUser(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { deletedAt: true },
+    });
+    if (!user?.deletedAt) return;
+    const at = user.deletedAt;
+    const clear = { deletedAt: null, deletedById: null };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.updateMany({
+        where: { id: userId },
+        data: { ...clear, status: 'active' },
+      });
+      await tx.building.updateMany({
+        where: { userId, deletedAt: at },
+        data: clear,
+      });
+      await tx.unit.updateMany({
+        where: { building: { userId }, deletedAt: at },
+        data: clear,
+      });
+      await tx.tenant.updateMany({
+        where: { building: { userId }, deletedAt: at },
+        data: clear,
+      });
+      await tx.lease.updateMany({
+        where: { building: { userId }, deletedAt: at },
+        data: clear,
+      });
+      await tx.parkingRegistration.updateMany({
+        where: { building: { userId }, deletedAt: at },
+        data: clear,
+      });
+      await tx.maintenanceRequest.updateMany({
+        where: { building: { userId }, deletedAt: at },
+        data: clear,
+      });
+      await tx.managerBuildingRole.updateMany({
+        where: {
+          deletedAt: at,
+          OR: [{ building: { userId } }, { manager: { userId } }],
+        },
+        data: clear,
+      });
+      await tx.manager.updateMany({
+        where: { userId, deletedAt: at },
+        data: clear,
+      });
+
+      // Reactivate subscriptions that were cancelled by this deletion and
+      // whose billing cycle has not ended in the meantime.
+      const cancelledByDeletion = await tx.subscriptionHistory.findMany({
+        where: { userId, action: 'cancelled', createdAt: at },
+        select: { subscriptionId: true, newPlanId: true },
+      });
+      const restorable = await tx.subscription.findMany({
+        where: {
+          id: { in: cancelledByDeletion.map((h) => h.subscriptionId) },
+          status: 'cancelled',
+          billingCycleEnd: { gt: new Date() },
+        },
+        select: { id: true, planId: true },
+      });
+      if (restorable.length > 0) {
+        await tx.subscription.updateMany({
+          where: { id: { in: restorable.map((s) => s.id) } },
+          data: { status: 'active' },
+        });
+        await tx.subscriptionHistory.createMany({
+          data: restorable.map((s) => ({
+            userId,
+            subscriptionId: s.id,
+            action: 'renewed' as const,
+            oldPlanId: s.planId,
+            newPlanId: s.planId,
+            notes: 'Reactivated after account restore',
+          })),
+        });
+      }
+    });
+  }
+
+  /**
    * Soft-delete a manager's assignment to a building (remove from building).
    */
   async softDeleteManagerBuildingRole(

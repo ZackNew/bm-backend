@@ -18,7 +18,9 @@ export class AppVersionController {
   constructor(private readonly appVersionService: AppVersionService) {}
 
   @Get('public')
-  @ApiOperation({ summary: 'Get current app version config (used by mobile apps)' })
+  @ApiOperation({
+    summary: 'Get current app version config (used by mobile apps)',
+  })
   @ApiResponse({ status: 200, description: 'Return app version config' })
   async getPublicConfig() {
     const result = await this.appVersionService.getConfig();
@@ -47,7 +49,10 @@ export class AppVersionController {
   @Roles('super_admin', 'system_manager')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update app version config' })
-  @ApiResponse({ status: 200, description: 'App version config updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'App version config updated successfully',
+  })
   async update(
     @Body() dto: UpdateAppVersionDto,
     @User() admin: { id: string; email: string },

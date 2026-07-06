@@ -38,11 +38,13 @@ import { ParkingModule } from './modules/user/parking/parking.module';
 import { ParkingRequestsModule } from './modules/user/parking-requests/parking-requests.module';
 import { PaymentRequestsModule } from './modules/user/payment-requests/payment-requests.module';
 import { SoftDeleteModule } from './common/soft-delete/soft-delete.module';
+import { UserDeletionModule } from './common/user-deletion/user-deletion.module';
 import { AppVersionModule } from './modules/platform-admin/app-version/app-version.module';
 
 @Module({
   imports: [
     SoftDeleteModule,
+    UserDeletionModule,
     AppVersionModule,
     TokenModule,
     EmailModule,
