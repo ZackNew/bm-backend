@@ -159,7 +159,7 @@ export class ParkingService {
     userId: string,
   ) {
     const request = await this.prisma.tenantParkingRequest.findFirst({
-      where: { id: requestId, buildingId },
+      where: { id: requestId, buildingId, tenant: { deletedAt: null } },
       include: {
         lease: { select: { id: true, carsAllowed: true } },
         unit: { select: { unitNumber: true } },

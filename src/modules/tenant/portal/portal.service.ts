@@ -66,8 +66,8 @@ export class PortalService {
   }
 
   async getProfile(tenantId: string) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null },
       include: {
         building: {
           select: {
@@ -81,7 +81,7 @@ export class PortalService {
           },
         },
         leases: {
-          where: { status: 'active' },
+          where: { status: 'active', deletedAt: null },
           orderBy: { startDate: 'desc' },
           include: {
             unit: {
@@ -121,13 +121,17 @@ export class PortalService {
     let buildingId: string | undefined;
     if (body.email !== undefined) {
       const current = await this.prisma.tenant.findFirst({
-        where: { id: tenantId },
+        where: { id: tenantId, deletedAt: null },
         select: { buildingId: true },
       });
       buildingId = current?.buildingId;
       if (current) {
         const existing = await this.prisma.tenant.findFirst({
-          where: { buildingId: current.buildingId, email: body.email },
+          where: {
+            buildingId: current.buildingId,
+            email: body.email,
+            deletedAt: null,
+          },
         });
         if (existing && existing.id !== tenantId) {
           throw new BadRequestException(
@@ -178,6 +182,7 @@ export class PortalService {
       where: {
         tenantId,
         status: 'active',
+        deletedAt: null,
       },
       orderBy: { startDate: 'desc' },
       include: {
@@ -267,8 +272,8 @@ export class PortalService {
     tenantId: string,
     dto: SubmitMaintenanceRequestDto,
   ) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null },
       select: { buildingId: true, name: true },
     });
 
@@ -277,7 +282,7 @@ export class PortalService {
     }
 
     const activeLease = await this.prisma.lease.findFirst({
-      where: { tenantId, status: 'active' },
+      where: { tenantId, status: 'active', deletedAt: null },
       select: { unitId: true },
     });
 
@@ -342,7 +347,7 @@ export class PortalService {
   }
 
   async getMaintenanceRequests(tenantId: string, limit = 20, offset = 0) {
-    const where = { tenantId };
+    const where = { tenantId, deletedAt: null };
     const [totalCount, data] = await Promise.all([
       this.prisma.maintenanceRequest.count({ where }),
       this.prisma.maintenanceRequest.findMany({
@@ -372,7 +377,7 @@ export class PortalService {
 
   async getMaintenanceRequest(tenantId: string, id: string) {
     const request = await this.prisma.maintenanceRequest.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId, deletedAt: null },
       include: {
         unit: {
           select: {
@@ -414,8 +419,8 @@ export class PortalService {
     if (!file?.buffer) {
       throw new BadRequestException('Receipt image is required');
     }
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null },
       select: { buildingId: true },
     });
     if (!tenant) {
@@ -426,6 +431,7 @@ export class PortalService {
         tenantId,
         unitId: body.unitId,
         status: 'active',
+        deletedAt: null,
         buildingId: tenant.buildingId,
       },
     });
@@ -601,11 +607,11 @@ export class PortalService {
   }
 
   async getPaymentCalendar(tenantId: string) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null },
       include: {
         leases: {
-          where: { status: 'active' },
+          where: { status: 'active', deletedAt: null },
           include: {
             unit: { select: { id: true, unitNumber: true, floor: true } },
             paymentPeriods: { orderBy: { month: 'asc' } },
@@ -643,6 +649,7 @@ export class PortalService {
         lease: {
           tenantId,
           status: 'active',
+          deletedAt: null,
         },
         status: { in: ['unpaid', 'overdue'] },
       },
@@ -685,6 +692,7 @@ export class PortalService {
         lease: {
           tenantId,
           status: 'active',
+          deletedAt: null,
         },
       },
       select: {
@@ -747,6 +755,7 @@ export class PortalService {
         id: body.leaseId,
         tenantId,
         status: 'active',
+        deletedAt: null,
       },
       select: {
         id: true,
@@ -759,7 +768,7 @@ export class PortalService {
       throw new BadRequestException('No active lease found for this unit');
     }
     const existingCount = await this.prisma.parkingRegistration.count({
-      where: { leaseId: lease.id },
+      where: { leaseId: lease.id, deletedAt: null },
     });
     if (existingCount >= lease.carsAllowed) {
       throw new BadRequestException(

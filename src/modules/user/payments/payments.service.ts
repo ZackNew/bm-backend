@@ -43,10 +43,10 @@ export class PaymentsService {
     userRole: string,
   ) {
     const tenant = await this.prisma.tenant.findFirst({
-      where: { id: dto.tenantId, buildingId },
+      where: { id: dto.tenantId, buildingId, deletedAt: null },
       include: {
         leases: {
-          where: { status: 'active', unitId: dto.unitId },
+          where: { status: 'active', unitId: dto.unitId, deletedAt: null },
           orderBy: { startDate: 'desc' },
           take: 1,
         },
@@ -368,10 +368,10 @@ export class PaymentsService {
   async getPaymentCalendar(buildingId: string, tenantId: string) {
     const [tenant, building] = await Promise.all([
       this.prisma.tenant.findFirst({
-        where: { id: tenantId, buildingId },
+        where: { id: tenantId, buildingId, deletedAt: null },
         include: {
           leases: {
-            where: { status: 'active' },
+            where: { status: 'active', deletedAt: null },
             include: {
               unit: { select: { id: true, unitNumber: true, floor: true } },
               paymentPeriods: { orderBy: { month: 'asc' } },
@@ -455,7 +455,7 @@ export class PaymentsService {
     userRole: string,
   ) {
     const request = await this.prisma.tenantPaymentRequest.findFirst({
-      where: { id: requestId, buildingId },
+      where: { id: requestId, buildingId, tenant: { deletedAt: null } },
       include: {
         tenant: { select: { id: true } },
         unit: { select: { unitNumber: true } },

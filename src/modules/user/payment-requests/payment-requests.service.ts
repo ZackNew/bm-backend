@@ -42,7 +42,10 @@ export class PaymentRequestsService {
     offset = 0,
     filters?: { status?: string; q?: string },
   ) {
-    const where: Prisma.TenantPaymentRequestWhereInput = { buildingId };
+    const where: Prisma.TenantPaymentRequestWhereInput = {
+      buildingId,
+      tenant: { deletedAt: null },
+    };
     if (
       filters?.status &&
       ['pending', 'approved', 'rejected'].includes(filters.status)
@@ -78,7 +81,7 @@ export class PaymentRequestsService {
 
   async findOne(id: string, buildingId: string) {
     const request = await this.prisma.tenantPaymentRequest.findFirst({
-      where: { id, buildingId },
+      where: { id, buildingId, tenant: { deletedAt: null } },
       include: requestInclude,
     });
     if (!request) {
@@ -94,7 +97,7 @@ export class PaymentRequestsService {
     rejectionReason?: string,
   ) {
     const request = await this.prisma.tenantPaymentRequest.findFirst({
-      where: { id, buildingId },
+      where: { id, buildingId, tenant: { deletedAt: null } },
       include: { unit: { select: { unitNumber: true } } },
     });
     if (!request) {

@@ -158,6 +158,7 @@ export class SchedulerService {
     const expiringLeases = await this.prisma.lease.findMany({
       where: {
         status: 'active',
+        deletedAt: null,
         endDate: {
           gte: new Date(),
           lte: thirtyDaysFromNow,
@@ -202,6 +203,7 @@ export class SchedulerService {
     const result = await this.prisma.paymentPeriod.updateMany({
       where: {
         status: 'unpaid',
+        lease: { deletedAt: null },
         OR: [
           { periodEnd: { lt: now } },
           { periodEnd: null, month: { lt: currentMonthStr } },
@@ -219,6 +221,7 @@ export class SchedulerService {
     const expiredLeases = await this.prisma.lease.findMany({
       where: {
         status: 'active',
+        deletedAt: null,
         endDate: {
           lt: new Date(),
         },
@@ -270,6 +273,7 @@ export class SchedulerService {
         dueDate: {
           lt: new Date(),
         },
+        tenant: { deletedAt: null },
       },
       select: {
         id: true,
@@ -336,6 +340,7 @@ export class SchedulerService {
           gte: new Date(),
           lte: fiveDaysFromNow,
         },
+        tenant: { deletedAt: null },
       },
       select: {
         id: true,

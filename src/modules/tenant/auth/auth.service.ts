@@ -26,7 +26,7 @@ export class TenantAuthService {
 
   async login(dto: TenantLoginDto) {
     const candidates = await this.prisma.tenant.findMany({
-      where: { email: dto.email },
+      where: { email: dto.email, deletedAt: null },
       include: {
         building: {
           select: {
@@ -91,7 +91,7 @@ export class TenantAuthService {
 
   async requestOtp(dto: RequestOtpDto) {
     const tenant = await this.prisma.tenant.findFirst({
-      where: { email: dto.email },
+      where: { email: dto.email, deletedAt: null },
     });
 
     if (!tenant) {
@@ -112,7 +112,7 @@ export class TenantAuthService {
 
   async resetPassword(dto: ResetPasswordDto) {
     const tenant = await this.prisma.tenant.findFirst({
-      where: { email: dto.email },
+      where: { email: dto.email, deletedAt: null },
     });
 
     if (!tenant) {
@@ -140,8 +140,8 @@ export class TenantAuthService {
   }
 
   async changePassword(tenantId: string, dto: ChangePasswordDto) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null },
     });
 
     if (!tenant) {
@@ -200,7 +200,7 @@ export class TenantAuthService {
       }>(refreshToken);
 
       const tenant = await this.prisma.tenant.findFirst({
-        where: { id: payload.sub },
+        where: { id: payload.sub, deletedAt: null },
       });
 
       if (!tenant || tenant.status === 'inactive') {
