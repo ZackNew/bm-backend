@@ -17,11 +17,15 @@ export class DashboardService {
       revenueThisMonth,
       pendingRequests,
     ] = await Promise.all([
-      this.prisma.tenant.count({ where: { buildingId, status: 'active' } }),
-      this.prisma.unit.count({
-        where: { buildingId, status: { not: 'inactive' } },
+      this.prisma.tenant.count({
+        where: { buildingId, status: 'active', deletedAt: null },
       }),
-      this.prisma.unit.count({ where: { buildingId, status: 'occupied' } }),
+      this.prisma.unit.count({
+        where: { buildingId, status: { not: 'inactive' }, deletedAt: null },
+      }),
+      this.prisma.unit.count({
+        where: { buildingId, status: 'occupied', deletedAt: null },
+      }),
       this.prisma.payment.aggregate({
         where: {
           buildingId,
@@ -31,7 +35,11 @@ export class DashboardService {
         _sum: { amount: true },
       }),
       this.prisma.maintenanceRequest.count({
-        where: { buildingId, status: { in: ['pending', 'in_progress'] } },
+        where: {
+          buildingId,
+          status: { in: ['pending', 'in_progress'] },
+          deletedAt: null,
+        },
       }),
     ]);
 
@@ -58,7 +66,7 @@ export class DashboardService {
 
     const upcomingPeriods = await this.prisma.paymentPeriod.findMany({
       where: {
-        lease: { buildingId, status: 'active' },
+        lease: { buildingId, status: 'active', deletedAt: null },
         status: { in: ['unpaid', 'overdue'] },
         month: { in: [currentMonth, nextMonth] },
       },

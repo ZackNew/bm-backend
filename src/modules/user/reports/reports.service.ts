@@ -59,7 +59,7 @@ export class ReportsService {
       this.prisma.unit.count({ where: { buildingId, status: 'vacant' } }),
       this.prisma.paymentPeriod.findMany({
         where: {
-          lease: { buildingId, status: 'active' },
+          lease: { buildingId, status: 'active', deletedAt: null },
           periodStart: { lte: endOfMonth },
           periodEnd: { gte: startOfMonth },
         },
@@ -77,7 +77,7 @@ export class ReportsService {
         .then((r) => Number(r._sum.amount ?? 0)),
       this.prisma.paymentPeriod.findMany({
         where: {
-          lease: { buildingId, status: 'active' },
+          lease: { buildingId, status: 'active', deletedAt: null },
           status: { in: ['unpaid', 'overdue'] },
         },
         select: { leaseId: true, rentAmount: true },
@@ -87,13 +87,14 @@ export class ReportsService {
         select: { vatRate: true, withholdingRate: true },
       }),
       this.prisma.lease.findMany({
-        where: { buildingId, status: 'active' },
+        where: { buildingId, status: 'active', deletedAt: null },
         select: { id: true, applyWithholding: true },
       }),
       this.prisma.lease.count({
         where: {
           buildingId,
           status: 'active',
+          deletedAt: null,
           endDate: {
             gte: now,
             lte: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
@@ -104,6 +105,7 @@ export class ReportsService {
         where: {
           buildingId,
           status: { in: ['pending', 'in_progress'] },
+          deletedAt: null,
         },
       }),
     ]);
@@ -187,6 +189,7 @@ export class ReportsService {
         where: {
           buildingId,
           status: { in: ['pending', 'in_progress'] },
+          deletedAt: null,
         },
       }),
       this.prisma.maintenanceRequest.groupBy({
@@ -288,7 +291,7 @@ export class ReportsService {
     }> = [];
     if (historyMonths > 0 && allUnits.length > 0) {
       const leases = await this.prisma.lease.findMany({
-        where: { buildingId, status: 'active' },
+        where: { buildingId, status: 'active', deletedAt: null },
         select: { startDate: true, endDate: true },
       });
       const total = allUnits.length;
@@ -358,7 +361,7 @@ export class ReportsService {
     ] = await Promise.all([
       this.prisma.paymentPeriod.findMany({
         where: {
-          lease: { buildingId, status: 'active' },
+          lease: { buildingId, status: 'active', deletedAt: null },
           periodStart: { lte: end },
           periodEnd: { gte: start },
         },
@@ -374,7 +377,7 @@ export class ReportsService {
       }),
       this.prisma.paymentPeriod.findMany({
         where: {
-          lease: { buildingId, status: 'active' },
+          lease: { buildingId, status: 'active', deletedAt: null },
           status: { in: ['unpaid', 'overdue'] },
         },
         select: {
@@ -390,7 +393,7 @@ export class ReportsService {
         select: { vatRate: true, withholdingRate: true },
       }),
       this.prisma.lease.findMany({
-        where: { buildingId, status: 'active' },
+        where: { buildingId, status: 'active', deletedAt: null },
         select: {
           id: true,
           applyWithholding: true,
@@ -581,12 +584,17 @@ export class ReportsService {
       expiringIn90Days,
       tenantPaymentHistory,
     ] = await Promise.all([
-      this.prisma.tenant.count({ where: { buildingId, status: 'active' } }),
-      this.prisma.tenant.count({ where: { buildingId, status: 'inactive' } }),
+      this.prisma.tenant.count({
+        where: { buildingId, status: 'active', deletedAt: null },
+      }),
+      this.prisma.tenant.count({
+        where: { buildingId, status: 'inactive', deletedAt: null },
+      }),
       this.prisma.lease.findMany({
         where: {
           buildingId,
           status: 'active',
+          deletedAt: null,
           endDate: { gte: new Date(), lte: in90 },
         },
         include: {
@@ -596,7 +604,7 @@ export class ReportsService {
         orderBy: { endDate: 'asc' },
       }),
       this.prisma.tenant.findMany({
-        where: { buildingId, status: 'active' },
+        where: { buildingId, status: 'active', deletedAt: null },
         select: {
           id: true,
           name: true,

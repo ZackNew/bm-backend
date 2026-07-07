@@ -1,7 +1,9 @@
 import {
   Controller,
+  Delete,
   Get,
   Patch,
+  Post,
   Param,
   Query,
   Body,
@@ -17,6 +19,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { User } from '../../../common/decorators/user.decorator';
 
 @ApiTags('Platform Admin Users')
 @Controller('v1/platform')
@@ -32,21 +35,50 @@ export class UsersController {
   @ApiOperation({ summary: 'List all owners with pagination and filters' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'status', required: false, enum: ['active', 'inactive'] })
+  @ApiQuery({ name: 'deleted', required: false, type: Boolean })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async findAllOwners(
     @Query('search') search?: string,
     @Query('status') status?: 'active' | 'inactive',
+    @Query('deleted') deleted?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     const result = await this.usersService.findAllOwners({
       search,
       status,
+      deleted: deleted === 'true',
       page: page ? parseInt(page) : undefined,
       limit: limit ? parseInt(limit) : undefined,
     });
     return { success: true, ...result };
+  }
+
+  @Delete('users/:id')
+  @Roles('super_admin')
+  @ApiOperation({
+    summary:
+      'Schedule an owner account for deletion (soft-delete now, purge after grace period)',
+  })
+  async softDeleteOwner(
+    @Param('id') id: string,
+    @User() admin: { id: string },
+  ) {
+    const result = await this.usersService.softDeleteOwner(id, admin.id);
+    return {
+      success: true,
+      data: result,
+      message: 'Account scheduled for deletion',
+    };
+  }
+
+  @Post('users/:id/restore')
+  @Roles('super_admin')
+  @ApiOperation({ summary: 'Restore an owner account within the grace period' })
+  async restoreOwner(@Param('id') id: string, @User() admin: { id: string }) {
+    const result = await this.usersService.restoreOwner(id, admin.id);
+    return { success: true, data: result, message: 'Account restored' };
   }
 
   @Patch('users/:id/status')

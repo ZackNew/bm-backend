@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserDeletionService } from '../user-deletion/user-deletion.service';
 
 @Injectable()
 export class SchedulerService {
@@ -12,7 +13,17 @@ export class SchedulerService {
     private prisma: PrismaService,
     private emailService: EmailService,
     private notificationsService: NotificationsService,
+    private userDeletionService: UserDeletionService,
   ) {}
+
+  // ========== ACCOUNT DELETION ==========
+
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  async purgeDeletedUsers() {
+    this.logger.log('Purging owner accounts past the deletion grace period...');
+    const purged = await this.userDeletionService.purgeExpiredUsers();
+    this.logger.log(`Purged ${purged} owner account(s)`);
+  }
 
   // ========== SUBSCRIPTIONS ==========
 
@@ -147,6 +158,7 @@ export class SchedulerService {
     const expiringLeases = await this.prisma.lease.findMany({
       where: {
         status: 'active',
+        deletedAt: null,
         endDate: {
           gte: new Date(),
           lte: thirtyDaysFromNow,
@@ -191,6 +203,7 @@ export class SchedulerService {
     const result = await this.prisma.paymentPeriod.updateMany({
       where: {
         status: 'unpaid',
+        lease: { deletedAt: null },
         OR: [
           { periodEnd: { lt: now } },
           { periodEnd: null, month: { lt: currentMonthStr } },
@@ -208,6 +221,7 @@ export class SchedulerService {
     const expiredLeases = await this.prisma.lease.findMany({
       where: {
         status: 'active',
+        deletedAt: null,
         endDate: {
           lt: new Date(),
         },
@@ -259,6 +273,7 @@ export class SchedulerService {
         dueDate: {
           lt: new Date(),
         },
+        tenant: { deletedAt: null },
       },
       select: {
         id: true,
@@ -325,6 +340,7 @@ export class SchedulerService {
           gte: new Date(),
           lte: fiveDaysFromNow,
         },
+        tenant: { deletedAt: null },
       },
       select: {
         id: true,

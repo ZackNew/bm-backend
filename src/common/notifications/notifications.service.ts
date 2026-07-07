@@ -54,8 +54,8 @@ export class NotificationsService {
           userRole: 'manager',
         };
     } else if (userType === 'tenant') {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id: userId },
+      const tenant = await this.prisma.tenant.findFirst({
+        where: { id: userId, deletedAt: null },
         select: { buildingId: true, name: true },
       });
       if (tenant)

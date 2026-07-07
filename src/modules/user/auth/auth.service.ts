@@ -13,10 +13,13 @@ import {
   ResetPasswordDto,
   ChangePasswordDto,
   UpdateEmailDto,
+  DeleteAccountDto,
 } from './dto';
 import * as bcrypt from 'bcrypt';
 import { TokenService } from 'src/common/token/token.service';
 import { EmailService } from 'src/common/email/email.service';
+import { SoftDeleteService } from 'src/common/soft-delete/soft-delete.service';
+import { UserDeletionService } from 'src/common/user-deletion/user-deletion.service';
 import { OtpType, UserType } from 'generated/prisma/client';
 
 @Injectable()
@@ -26,6 +29,8 @@ export class AuthService {
     private jwtService: JwtService,
     private tokenService: TokenService,
     private emailService: EmailService,
+    private softDeleteService: SoftDeleteService,
+    private userDeletionService: UserDeletionService,
   ) {}
 
   async register(dto: RegisterUserDto) {
@@ -107,6 +112,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.deletedAt) {
+      throw new UnauthorizedException(
+        'This account is scheduled for deletion. Contact support to restore it.',
+      );
+    }
+
     if (user.status === 'inactive') {
       throw new UnauthorizedException('Account is inactive');
     }
@@ -154,7 +165,7 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    if (!user) {
+    if (!user || user.deletedAt) {
       return { message: 'If email exists, OTP has been sent' };
     }
 
@@ -175,7 +186,7 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    if (!user) {
+    if (!user || user.deletedAt) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -243,6 +254,45 @@ export class AuthService {
     return { message: 'Email updated successfully', email: dto.email };
   }
 
+  async deleteAccount(userId: string, dto: DeleteAccountDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.deletedAt) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Password is incorrect');
+    }
+
+    const deletedAt = await this.softDeleteService.softDeleteUser(
+      userId,
+      userId,
+    );
+    const purgeAt = this.userDeletionService.purgeDateFor(deletedAt);
+
+    try {
+      await this.emailService.sendAccountDeletionScheduledEmail(
+        user.email,
+        user.name,
+        purgeAt,
+      );
+    } catch (error) {
+      console.error(error);
+    }
+
+    return {
+      message: 'Account scheduled for deletion',
+      purgeAt,
+    };
+  }
+
   async refresh(refreshToken: string) {
     try {
       const payload = this.jwtService.verify<{
@@ -256,7 +306,7 @@ export class AuthService {
         where: { id: payload.sub },
       });
 
-      if (!user || user.status === 'inactive') {
+      if (!user || user.status === 'inactive' || user.deletedAt) {
         throw new UnauthorizedException('Invalid token');
       }
 

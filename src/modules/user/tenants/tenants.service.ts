@@ -53,6 +53,7 @@ export class TenantsService {
         buildingId,
         passwordHash,
         status: 'inactive',
+        mustResetPassword: true,
       },
     });
 
@@ -259,16 +260,7 @@ export class TenantsService {
       throw new NotFoundException('Tenant not found');
     }
 
-    const activeLeaseCount = await this.prisma.lease.count({
-      where: whereActive({ tenantId: id, status: 'active' as const }),
-    });
-    if (activeLeaseCount > 0) {
-      throw new ConflictException(
-        'Cannot delete tenant with an active lease. End or remove the lease first.',
-      );
-    }
-
-    await this.softDeleteService.softDeleteTenant(id, userId);
+    const cascade = await this.softDeleteService.softDeleteTenant(id, userId);
 
     const userName = await this.getUserName(userId, userRole);
     await this.activityLogsService.create({
@@ -282,10 +274,133 @@ export class TenantsService {
       details: {
         name: tenant.name,
         email: tenant.email,
+        cascade: {
+          leases: cascade.leases,
+          unitsFreed: cascade.unitsFreed,
+          parkingRegistrations: cascade.parkingRegistrations,
+          maintenanceRequests: cascade.maintenanceRequests,
+        },
       } as Prisma.InputJsonValue,
     });
 
     return { message: 'Tenant deleted successfully' };
+  }
+
+  async getDeletionPreview(id: string, buildingId: string) {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: whereActive({ id, buildingId }),
+      select: { id: true, name: true, email: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const [
+      activeLeases,
+      unpaidPaymentPeriods,
+      vehicles,
+      pendingPaymentRequests,
+      pendingParkingRequests,
+      openMaintenanceRequests,
+    ] = await Promise.all([
+      this.prisma.lease.findMany({
+        where: whereActive({ tenantId: id, status: 'active' as const }),
+        select: {
+          id: true,
+          endDate: true,
+          rentAmount: true,
+          unit: { select: { unitNumber: true, floor: true } },
+        },
+      }),
+      this.prisma.paymentPeriod.count({
+        where: {
+          status: { in: ['unpaid', 'overdue'] },
+          lease: { tenantId: id, deletedAt: null },
+        },
+      }),
+      this.prisma.parkingRegistration.count({
+        where: whereActive({ tenantId: id }),
+      }),
+      this.prisma.tenantPaymentRequest.count({
+        where: { tenantId: id, status: 'pending' },
+      }),
+      this.prisma.tenantParkingRequest.count({
+        where: { tenantId: id, status: 'pending' },
+      }),
+      this.prisma.maintenanceRequest.count({
+        where: whereActive({
+          tenantId: id,
+          status: { in: ['pending' as const, 'in_progress' as const] },
+        }),
+      }),
+    ]);
+
+    return {
+      tenant,
+      activeLeases: activeLeases.map((lease) => ({
+        id: lease.id,
+        unitNumber: lease.unit.unitNumber,
+        floor: lease.unit.floor,
+        endDate: lease.endDate,
+        rentAmount: Number(lease.rentAmount),
+      })),
+      counts: {
+        activeLeases: activeLeases.length,
+        unpaidPaymentPeriods,
+        vehicles,
+        pendingPaymentRequests,
+        pendingParkingRequests,
+        openMaintenanceRequests,
+      },
+    };
+  }
+
+  async restore(
+    id: string,
+    buildingId: string,
+    userId: string,
+    userRole: string,
+  ) {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id, buildingId, deletedAt: { not: null } },
+      select: { id: true, name: true, email: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Deleted tenant not found');
+    }
+
+    const existingTenant = await this.prisma.tenant.findFirst({
+      where: whereActive({ buildingId, email: tenant.email }),
+    });
+    if (existingTenant) {
+      throw new ConflictException(
+        'A tenant with this email already exists in this building',
+      );
+    }
+
+    const result = await this.softDeleteService.restoreTenant(id);
+
+    const userName = await this.getUserName(userId, userRole);
+    await this.activityLogsService.create({
+      action: 'update',
+      entityType: 'tenant',
+      entityId: id,
+      userId,
+      userName,
+      userRole,
+      buildingId,
+      details: {
+        restored: true,
+        name: tenant.name,
+        email: tenant.email,
+        restoredLeases: result.restoredLeases,
+        unitConflicts: result.unitConflicts,
+      } as Prisma.InputJsonValue,
+    });
+
+    return { message: 'Tenant restored successfully' };
   }
 
   private async getUserName(userId: string, userRole: string): Promise<string> {
@@ -355,6 +470,7 @@ export class TenantsService {
           phone: dto.phone,
           tin: dto.tin,
           passwordHash,
+          mustResetPassword: !dto.password,
         },
       });
 

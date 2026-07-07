@@ -31,6 +31,40 @@ export class EmailService {
     });
   }
 
+  async sendAccountDeletionScheduledEmail(
+    email: string,
+    name: string,
+    purgeDate: Date,
+  ) {
+    await this.resend.emails.send({
+      from: this.fromAddress,
+      to: email,
+      subject: 'Your account is scheduled for deletion',
+      html: `
+        <h1>Account Deletion Scheduled</h1>
+        <p>Hi ${name},</p>
+        <p>Your Building Management System account has been scheduled for deletion.</p>
+        <p>All your buildings, tenants, leases and related data are no longer accessible.</p>
+        <p><strong>Your account and all its data will be permanently deleted on ${purgeDate.toLocaleDateString()}.</strong></p>
+        <p>If this was a mistake or you change your mind, contact support before that date to restore your account.</p>
+      `,
+    });
+  }
+
+  async sendAccountRestoredEmail(email: string, name: string) {
+    await this.resend.emails.send({
+      from: this.fromAddress,
+      to: email,
+      subject: 'Your account has been restored',
+      html: `
+        <h1>Account Restored</h1>
+        <p>Hi ${name},</p>
+        <p>Your Building Management System account has been restored. Your buildings, tenants and leases are available again.</p>
+        <p>You can log in as usual.</p>
+      `,
+    });
+  }
+
   async sendUserPasswordResetEmail(email: string, resetToken: string) {
     await this.resend.emails.send({
       from: this.fromAddress,

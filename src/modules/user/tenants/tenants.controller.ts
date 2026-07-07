@@ -86,6 +86,50 @@ export class TenantsController {
     };
   }
 
+  @Get(':id/deletion-preview')
+  @UseGuards(ManagerRolesGuard)
+  @RequireManagerRoles(ManagerRole.tenant_manager)
+  @ApiOperation({
+    summary: 'Preview what deleting a tenant will affect',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Return active leases and related record counts',
+  })
+  async deletionPreview(
+    @User() user: { id: string },
+    @BuildingId() buildingId: string,
+    @Param('id') id: string,
+  ) {
+    const result = await this.tenantsService.getDeletionPreview(id, buildingId);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Post(':id/restore')
+  @UseGuards(ManagerRolesGuard)
+  @RequireManagerRoles(ManagerRole.tenant_manager)
+  @ApiOperation({ summary: 'Restore a soft-deleted tenant' })
+  @ApiResponse({ status: 200, description: 'Tenant restored successfully' })
+  async restore(
+    @User() user: { id: string; role: string },
+    @BuildingId() buildingId: string,
+    @Param('id') id: string,
+  ) {
+    const result = await this.tenantsService.restore(
+      id,
+      buildingId,
+      user.id,
+      user.role,
+    );
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
   @Get(':id')
   @UseGuards(ManagerRolesGuard)
   @RequireManagerRoles(ManagerRole.tenant_manager)

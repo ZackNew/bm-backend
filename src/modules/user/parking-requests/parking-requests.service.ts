@@ -41,7 +41,10 @@ export class ParkingRequestsService {
     offset = 0,
     filters?: { status?: string; q?: string },
   ) {
-    const where: Prisma.TenantParkingRequestWhereInput = { buildingId };
+    const where: Prisma.TenantParkingRequestWhereInput = {
+      buildingId,
+      tenant: { deletedAt: null },
+    };
     if (
       filters?.status &&
       ['pending', 'approved', 'rejected'].includes(filters.status)
@@ -73,7 +76,7 @@ export class ParkingRequestsService {
 
   async findOne(id: string, buildingId: string) {
     const request = await this.prisma.tenantParkingRequest.findFirst({
-      where: { id, buildingId },
+      where: { id, buildingId, tenant: { deletedAt: null } },
       include: requestInclude,
     });
     if (!request) {
@@ -89,7 +92,7 @@ export class ParkingRequestsService {
     rejectionReason?: string,
   ) {
     const request = await this.prisma.tenantParkingRequest.findFirst({
-      where: { id, buildingId },
+      where: { id, buildingId, tenant: { deletedAt: null } },
       include: { unit: { select: { unitNumber: true } } },
     });
     if (!request) {

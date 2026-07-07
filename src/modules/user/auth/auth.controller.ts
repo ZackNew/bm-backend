@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Post,
   Patch,
   Body,
@@ -21,6 +22,7 @@ import {
   ResetPasswordDto,
   ChangePasswordDto,
   UpdateEmailDto,
+  DeleteAccountDto,
 } from './dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { User } from 'src/common/decorators/user.decorator';
@@ -103,6 +105,27 @@ export class AuthController {
     return {
       success: true,
       data: result,
+    };
+  }
+
+  @Delete('account')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Delete my account (soft-delete now, permanently purged after grace period)',
+  })
+  @ApiResponse({ status: 200, description: 'Account scheduled for deletion' })
+  async deleteAccount(
+    @User() user: { id: string },
+    @Body() dto: DeleteAccountDto,
+  ) {
+    const result = await this.authService.deleteAccount(user.id, dto);
+    return {
+      success: true,
+      data: result,
+      message: result.message,
     };
   }
 

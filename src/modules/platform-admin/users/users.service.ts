@@ -1,13 +1,27 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { SoftDeleteService } from '../../../common/soft-delete/soft-delete.service';
+import { UserDeletionService } from '../../../common/user-deletion/user-deletion.service';
+import { EmailService } from '../../../common/email/email.service';
+import type { Prisma } from 'generated/prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private softDeleteService: SoftDeleteService,
+    private userDeletionService: UserDeletionService,
+    private emailService: EmailService,
+  ) {}
 
   async findAllOwners(query: {
     search?: string;
     status?: 'active' | 'inactive';
+    deleted?: boolean;
     page?: number;
     limit?: number;
   }) {
@@ -15,7 +29,9 @@ export class UsersService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: undefined };
+    const where: Prisma.UserWhereInput = {
+      deletedAt: query.deleted ? { not: null } : null,
+    };
     if (query.status) where.status = query.status;
     if (query.search) {
       where.OR = [
@@ -33,6 +49,7 @@ export class UsersService {
           email: true,
           phone: true,
           status: true,
+          deletedAt: true,
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -42,11 +59,98 @@ export class UsersService {
       this.prisma.user.count({ where }),
     ]);
 
-    return { data: users, total, page, limit, totalPages: Math.ceil(total / limit) };
+    const data = users.map((u) => ({
+      ...u,
+      purgeAt: u.deletedAt
+        ? this.userDeletionService.purgeDateFor(u.deletedAt)
+        : null,
+    }));
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async softDeleteOwner(id: string, adminId: string) {
+    const [user, admin] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id },
+        select: { id: true, name: true, email: true, deletedAt: true },
+      }),
+      this.prisma.platformAdmin.findUnique({
+        where: { id: adminId },
+        select: { name: true },
+      }),
+    ]);
+    if (!user || user.deletedAt) throw new NotFoundException('User not found');
+
+    const deletedAt = await this.softDeleteService.softDeleteUser(id, adminId);
+    const purgeAt = this.userDeletionService.purgeDateFor(deletedAt);
+
+    await this.prisma.platformActivityLog.create({
+      data: {
+        action: 'delete',
+        entityType: 'user',
+        entityId: id,
+        adminId,
+        adminName: admin?.name ?? 'Unknown admin',
+        details: { email: user.email, purgeAt: purgeAt.toISOString() },
+      },
+    });
+
+    try {
+      await this.emailService.sendAccountDeletionScheduledEmail(
+        user.email,
+        user.name,
+        purgeAt,
+      );
+    } catch (error) {
+      console.error(error);
+    }
+
+    return { id: user.id, email: user.email, deletedAt, purgeAt };
+  }
+
+  async restoreOwner(id: string, adminId: string) {
+    const [user, admin] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id },
+        select: { id: true, name: true, email: true, deletedAt: true },
+      }),
+      this.prisma.platformAdmin.findUnique({
+        where: { id: adminId },
+        select: { name: true },
+      }),
+    ]);
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.deletedAt) {
+      throw new ConflictException('User is not scheduled for deletion');
+    }
+
+    await this.softDeleteService.restoreUser(id);
+
+    await this.prisma.platformActivityLog.create({
+      data: {
+        action: 'update',
+        entityType: 'user',
+        entityId: id,
+        adminId,
+        adminName: admin?.name ?? 'Unknown admin',
+        details: { email: user.email, restored: true },
+      },
+    });
+
+    try {
+      await this.emailService.sendAccountRestoredEmail(user.email, user.name);
+    } catch (error) {
+      console.error(error);
+    }
+
+    return { id: user.id, email: user.email };
   }
 
   async updateOwnerStatus(id: string, status: 'active' | 'inactive') {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!user) throw new NotFoundException('User not found');
 
     const updated = await this.prisma.user.update({
@@ -67,7 +171,7 @@ export class UsersService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: null };
+    const where: Prisma.ManagerWhereInput = { deletedAt: null };
     if (query.status) where.status = query.status;
     if (query.search) {
       where.OR = [
@@ -145,7 +249,7 @@ export class UsersService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: null };
+    const where: Prisma.TenantWhereInput = { deletedAt: null };
     if (query.status) where.status = query.status;
     if (query.search) {
       where.OR = [
